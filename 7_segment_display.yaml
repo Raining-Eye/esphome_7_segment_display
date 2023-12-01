@@ -1,0 +1,110 @@
+substitutions:
+  friendly_name: 7 Segment Clock
+
+esphome:
+  name: 7_segment
+  friendly_name: 7 Segment Clock
+
+# Replace with your board info
+esp32:
+  board: esp32dev
+  framework:
+    type: arduino
+
+logger:
+
+api:
+  encryption:
+    key: "YOUR ENCRYPTION KEY"
+
+ota:
+  password: "YOUR OTA PASSWORD"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# Set GPIO pins
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO23
+
+number:
+  - platform: template
+    name: $friendly_name Brightness
+    id: brightness
+    optimistic: true
+    initial_value: 1
+    min_value: 0
+    max_value: 15
+    step: 1
+
+switch:
+  - platform: template
+    name: $friendly_name Power
+    id: power
+    optimistic: true
+    restore_mode: ALWAYS_ON
+
+sensor:
+  - platform: homeassistant
+    name: "indoor_temp"
+    id: indoor_temp
+    entity_id: sensor.my_indoor_temp_sensor
+  - platform: homeassistant
+    name: "outdoor_temp"
+    id: outdoor_temp
+    entity_id: weather.home
+    attribute: temperature
+  - platform: homeassistant
+    name: "indoor_hum"
+    id: indoor_hum
+    entity_id: sensor.my_indoor_hum_sensor
+  - platform: homeassistant
+    name: "outdoor_hum"
+    id: outdoor_hum
+    entity_id: weather.home
+    attribute: humidity
+
+time:
+  - platform: homeassistant
+    id: homeassistant_time
+
+# Setup Display
+display:
+  - platform: max7219
+    cs_pin: GPIO5
+    id: segment_display
+    num_chips: 4
+    intensity: 1
+    setup_priority: -100
+    update_interval: 40ms
+    
+    lambda: |-
+      auto time = id(homeassistant_time).now();
+      
+      if(id(power).state) {
+        it.set_intensity(id(brightness).state);
+      } else {
+        it.set_intensity(0);
+      }
+
+      if(id(outdoor_temp).state > 99.9 || id(outdoor_temp).state <= -10) {
+        it.printf(8, "%.0f'", id(outdoor_temp).state);
+      } else if(id(outdoor_temp).state < 10 && id(outdoor_temp).state >= 0) {
+        it.printf(9, "%.1f'", id(outdoor_temp).state);
+      } else {
+        it.printf(8, "%.1f'", id(outdoor_temp).state);
+      }
+
+      it.printf(13, "%.0f%:", id(outdoor_hum).state);
+      it.printf(5, "%.0f:", id(indoor_hum).state);
+      it.printf(0, "%.1f'", id(indoor_temp).state);
+
+      if(time.second % 2 == 0) {
+        it.strftime(16, "%I %M %S", id(homeassistant_time).now());
+        it.strftime(24, "%m %d %y", id(homeassistant_time).now());
+      } else {
+        it.strftime(16, "%I .%M .%S", id(homeassistant_time).now());
+        it.strftime(24, "%m-%d-%y", id(homeassistant_time).now());
+      }
